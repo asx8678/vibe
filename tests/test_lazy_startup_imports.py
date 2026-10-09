@@ -6,32 +6,6 @@ import subprocess
 import sys
 
 
-def test_importing_tui_app_does_not_import_deferred_startup_modules() -> None:
-    code = """
-import sys
-import vibe.cli.textual_ui.app
-
-blocked = [
-    "vibe.cli.textual_ui.widgets.connector_auth_app",
-    "vibe.cli.textual_ui.widgets.mcp_app",
-    "vibe.core.agent_loop",
-    "vibe.core.tools.connectors.connector_registry",
-    "vibe.core.tools.mcp.tools",
-    "mcp",
-    "git",
-]
-loaded = [name for name in blocked if name in sys.modules]
-if loaded:
-    raise SystemExit(f"unexpected startup modules loaded: {loaded}")
-"""
-
-    result = subprocess.run(
-        [sys.executable, "-c", code], check=False, capture_output=True, text=True
-    )
-
-    assert result.returncode == 0, result.stderr or result.stdout
-
-
 def test_importing_app_server_local_does_not_import_mcp_package() -> None:
     code = """
 import sys
@@ -45,22 +19,6 @@ blocked = [
 loaded = [name for name in blocked if name in sys.modules]
 if loaded:
     raise SystemExit(f"unexpected app server modules loaded: {loaded}")
-"""
-
-    result = subprocess.run(
-        [sys.executable, "-c", code], check=False, capture_output=True, text=True
-    )
-
-    assert result.returncode == 0, result.stderr or result.stdout
-
-
-def test_importing_cli_entrypoint_does_not_import_git() -> None:
-    code = """
-import sys
-import vibe.cli.entrypoint
-
-if "git" in sys.modules:
-    raise SystemExit("unexpected git module loaded")
 """
 
     result = subprocess.run(
@@ -108,27 +66,6 @@ blocked = [
 loaded = [name for name in blocked if name in sys.modules]
 if loaded:
     raise SystemExit(f"unexpected connector registry modules loaded: {loaded}")
-"""
-
-    result = subprocess.run(
-        [sys.executable, "-c", code], check=False, capture_output=True, text=True
-    )
-
-    assert result.returncode == 0, result.stderr or result.stdout
-
-
-def test_importing_mcp_app_does_not_import_mcp_runtime() -> None:
-    code = """
-import sys
-import vibe.cli.textual_ui.widgets.mcp_app
-
-blocked = [
-    "vibe.core.tools.mcp.tools",
-    "mcp",
-]
-loaded = [name for name in blocked if name in sys.modules]
-if loaded:
-    raise SystemExit(f"unexpected mcp app modules loaded: {loaded}")
 """
 
     result = subprocess.run(

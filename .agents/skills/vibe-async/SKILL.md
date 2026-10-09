@@ -17,7 +17,7 @@ Conventions for async and concurrent code in Vibe. Apply when touching the agent
 
 ## Blocking work
 
-- Never run CPU-heavy or I/O-bound code on the UI thread. The Textual TUI and the agent loop share one event loop, so anything blocking (large JSON/Pydantic serialization, `os.fsync`, subprocess calls, recursive globs) freezes the UI — offload it with `asyncio.to_thread`.
+- Never run CPU-heavy or I/O-bound code on the event loop. The agent loop shares one event loop with the app server's request handling, so anything blocking (large JSON/Pydantic serialization, `os.fsync`, subprocess calls, recursive globs) stalls the connected client — offload it with `asyncio.to_thread`.
 - Async file wrappers don't make blocking syscalls non-blocking.
 - Use `anyio.Path` for file I/O on async paths.
 

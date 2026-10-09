@@ -66,7 +66,6 @@ pub mod replay;
 pub mod resume_picker;
 pub mod resync_backend;
 pub mod rewind;
-pub mod rollout;
 pub mod search_field;
 pub mod selection;
 pub mod server;

@@ -9,7 +9,6 @@ adapter records.
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 import sys
 from typing import Any
@@ -28,27 +27,10 @@ from mistralai_vibe_local_harness.protocol import (
     RustToolSuccessResult,
 )
 from mistralai_vibe_local_harness.vibe import HookContext, LocalRuntimeAdapterConfig
-from tests.stubs.local_sandbox import (
-    EXECUTE_COMPLETION,
-    SANDBOX_ONLY_VARIABLE,
-    SUB_DOC,
-    RecordingSandbox,
-    Script,
-    ScriptedModel,
-    build_trusted_project,
-)
+from tests.stubs.local_sandbox import SUB_DOC, RecordingSandbox, build_trusted_project
 from vibe.app_server._agents_md_hooks import agents_md_hook
 from vibe.app_server._runtime import HarnessProcess
-from vibe.app_server.local import (
-    ClientDescriptor,
-    LocalHarnessHost,
-    LocalHarnessOptions,
-)
-from vibe.app_server.protocol import ClientCapabilities, ClientInfo, SessionOptions
-from vibe.app_server.run_export import HeadlessUsageError, RunLimits, RunOutcome
-from vibe.cli.headless_run import StopRequests
-from vibe.cli.programmatic import run_headless
-from vibe.core.agents.models import BuiltinAgentName
+from vibe.app_server.run_export import HeadlessUsageError
 from vibe.core.config.harness_files import HarnessFilesManager
 
 pytestmark = [
@@ -59,42 +41,9 @@ pytestmark = [
     ),
 ]
 
-_PARENT_TASK = "PARENT_TASK"
-_CHILD_TASK = "CHILD_TASK"
-
-_PARENT_PROGRAM = f"""
-async function main() {{
-  let processes;
-  try {{
-    processes = tools.process && tools.process.start
-      ? await tools.process.start({{command: "sleep 1"}})
-      : "process tools off";
-  }} catch (error) {{
-    processes = "failed: " + error.message;
-  }}
-  await tools.subagent.spawn({{agentName: "reader", message: {json.dumps(_CHILD_TASK)}}});
-  const child = await tools.subagent.wait({{agentName: "reader", timeoutMs: 30000}});
-  return {{processes: JSON.stringify(processes), child}};
-}}
-"""
-
-_CHILD_PROGRAM = f"""
-async function main() {{
-  const notes = await tools.file_system.read_file({{path: "sub/notes.txt"}});
-  const mark = await tools.file_system.bash({{command: "echo ${SANDBOX_ONLY_VARIABLE}"}});
-  return {{notes, mark}};
-}}
-"""
 
 # Each task's tool calls, in order, before its final answer. The parent reads
 # with a direct call, whose result the AGENTS.md hook extends.
-_SCRIPTS: dict[str, Script] = {
-    _PARENT_TASK: [
-        ("read_file", {"path": "sub/notes.txt"}),
-        ("run_typescript", {"code": _PARENT_PROGRAM}),
-    ],
-    _CHILD_TASK: [("run_typescript", {"code": _CHILD_PROGRAM})],
-}
 
 
 @pytest.fixture()
@@ -335,73 +284,6 @@ async def test_a_directory_whose_doc_read_failed_is_looked_up_again(
     # Assert
     assert first == []
     assert len(second) == 1 and "# Package rules" in second[0]
-
-
-@pytest.mark.parametrize("sandboxed", [False, True], ids=["host", "sandbox"])
-@pytest.mark.asyncio
-async def test_a_subagent_works_in_its_parents_workspace(
-    project: Path, monkeypatch: pytest.MonkeyPatch, sandboxed: bool
-) -> None:
-    """*Prepare*: A scripted parent that reads a file, tries a process tool and
-    spawns a subagent that reads a file and runs a command.
-    *Do*: Run it headless on the host and against a Sandbox Adapter.
-    *Assert*: Both see the same workspace and docs and start the process, the
-    sandboxed ones through the adapter.
-    """
-    # Prepare
-    scripted = ScriptedModel(_SCRIPTS)
-    monkeypatch.setattr(EXECUTE_COMPLETION, scripted)
-    sandbox = RecordingSandbox(project) if sandboxed else None
-    monkeypatch.setenv("XDG_STATE_HOME", str(project.parent / "state"))
-    host = LocalHarnessHost()
-
-    # Do
-    report = await run_headless(
-        harness_options=_options(project, sandbox),
-        prompt=_PARENT_TASK,
-        stop=StopRequests(RunLimits()),
-        harness_host=host,
-    )
-    await host.close()
-
-    # Assert
-    assert report.result.outcome is RunOutcome.FINISHED, report.result.error
-    parent = scripted.final_input(_PARENT_TASK)
-    child = scripted.final_input(_CHILD_TASK)
-    assert SUB_DOC in parent
-    assert "first note" in child
-    assert "processId" in parent
-    if sandbox is None:
-        return
-    operations = sandbox.helper_operations
-    assert str(project / "sub" / "AGENTS.md") in sandbox.reads
-    tool_operations = [
-        operation for operation in operations if not operation.startswith("skills-")
-    ]
-    assert "process" in tool_operations
-    assert sorted(op for op in tool_operations if op != "process") == [
-        "bash",
-        "file",
-        "file",
-    ]
-    assert "inside" in child
-
-
-def _options(project: Path, sandbox: RecordingSandbox | None) -> LocalHarnessOptions:
-    return LocalHarnessOptions(
-        client=ClientDescriptor(
-            info=ClientInfo(name="vibe_test", title="Vibe test", version="0"),
-            capabilities=ClientCapabilities(callback_kinds=["approval", "user_input"]),
-        ),
-        session_options=SessionOptions(
-            cwd=None if sandbox is not None else str(project),
-            agent=BuiltinAgentName.AUTO_APPROVE,
-            trust_workspace=sandbox is None,
-            headless=True,
-        ),
-        experimental_harness=True,
-        sandbox=sandbox,
-    )
 
 
 def _read_input(path: str) -> RustPostToolCallHookInput:

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `vibe` always runs the Rust TUI; the `VIBE_CLI` selector and the `vibe_cli_rust_tui_rollout` experiment are gone.
+
+### Removed
+
+- The Python (Textual) TUI and its Python CLI entrypoint, including the Python-only `vibe` flags `--prompt-file`, `--output-dir` (and `export.json`), `--time-limit`, `--agent-socket`, `--legacy-harness`, and `--experimental-harness`. Programmatic mode now exits `0` on success and `1` on any failure.
+- Shell `vibe mcp add` for stdio and static-auth servers; add those in `config.toml`.
+- The standalone PyInstaller `vibe` release archive; the `vibe-acp` archive is still built.
+
 ## [2.26.1] - 2026-10-09
 
 ### Added

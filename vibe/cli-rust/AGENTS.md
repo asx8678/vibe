@@ -1,7 +1,8 @@
 # AGENTS.md — vibe-rs
 
-A Rust/ratatui TUI for Vibe. It drives the **unchanged** Python engine over the
-app-server JSON-RPC protocol.
+A Rust/ratatui TUI for Vibe, and the only one: the Python (Textual) CLI has been
+removed. It drives the **unchanged** Python engine over the app-server JSON-RPC
+protocol.
 
 ## What this is
 
@@ -21,8 +22,8 @@ proto  ── serde types for the SUBSET of methods/notifications we use
 - Inspire yourself from codex/ folder, it is a good architecture and it is working well !
 - Keep pure-logic tests in `tests/units/<name>.rs` and register them in `tests/units.rs` so they share one integration-test binary. Keep tests that need process-global isolation in separate `tests/<name>.rs` binaries. Cover Rust rendering and interaction behavior with `client-e2e` scenarios and goldens -- see `client-e2e/AGENTS.md`.
 - No files with >300 lines of code allowed, simplicity is very important, keep things in separate modules.
-- This is the rewrite of the python code, when naming things, try to keep the same names as in the python code.
-- When implementing a feature, port it from the Python CLI and keep its behavior by default. Diverge only when it yields a more coherent design, a bug fix, or a better UX, or when a Rust-only feature is explicitly requested. Such divergences do not require updating the Python CLI.
+- When naming things, reuse the names the app-server protocol and the Python engine use.
+- The Python CLI is gone, so there is no second client to keep in sync. When re-creating a feature it had, its behavior (in git history) is the default reference; diverge when it yields a more coherent design, a bug fix, or a better UX.
 - No multi line comments ! Very short modeule docstrings
 - Unit tests are welcome, but never inline in source files: no `#[cfg(test)] mod tests { ... }` blocks under `src/`. Test through the crate API from `tests/` (see the layout rule above). When a test needs private items, put it in a child module file under the module's directory (`src/foo/tests.rs` for `src/foo.rs` or `src/foo/mod.rs`), declared with `#[cfg(test)] mod tests;`.
 

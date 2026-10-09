@@ -10,31 +10,14 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-import re
-import subprocess
 import sys
 
 import pytest
 
 pytest.importorskip("mistralai_vibe_local_harness.vibe")
 
-from tests.stubs.local_sandbox import (
-    EXECUTE_COMPLETION,
-    RecordingSandbox,
-    ScriptedModel,
-    build_trusted_project,
-)
+from tests.stubs.local_sandbox import RecordingSandbox, build_trusted_project
 from vibe.app_server._sandbox_skills import SKILLS_DIRNAME, SandboxSkills
-from vibe.app_server.local import (
-    ClientDescriptor,
-    LocalHarnessHost,
-    LocalHarnessOptions,
-)
-from vibe.app_server.protocol import ClientCapabilities, ClientInfo, SessionOptions
-from vibe.app_server.run_export import RunLimits, RunOutcome
-from vibe.cli.headless_run import StopRequests
-from vibe.cli.programmatic import run_headless
-from vibe.core.agents.models import BuiltinAgentName
 from vibe.core.skills.models import SkillInfo
 
 pytestmark = [
@@ -45,14 +28,10 @@ pytestmark = [
     ),
 ]
 
-_TASK = "SKILL_TASK"
-_BUILTIN_SKILLS = Path(__file__).parents[2] / "vibe/plugins/builtins/vibe/skills"
 # Only the commands that write a copy carry these: the helper's install
 # operation, and the file a large request is streamed into.
 _INSTALL_MARKER = " skills-install "
 _UPLOAD_MARKERS = (_INSTALL_MARKER, "mistralai-vibe-request-")
-_BASE_DIR = re.compile(r"Base directory for this skill: ([^\\\n]+)")
-_SKILL_PATH = re.compile(r"<path>([^<]+/SKILL\.md)</path>")
 
 
 @pytest.fixture
@@ -69,50 +48,12 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return build_trusted_project(tmp_path / "project", monkeypatch)
 
 
-def _options(sandbox: RecordingSandbox) -> LocalHarnessOptions:
-    return LocalHarnessOptions(
-        client=ClientDescriptor(
-            info=ClientInfo(name="vibe_test", title="Vibe test", version="0"),
-            capabilities=ClientCapabilities(callback_kinds=["approval", "user_input"]),
-        ),
-        session_options=SessionOptions(
-            agent=BuiltinAgentName.AUTO_APPROVE, headless=True
-        ),
-        experimental_harness=True,
-        sandbox=sandbox,
-    )
-
-
-async def _run_skill(
-    project: Path, monkeypatch: pytest.MonkeyPatch, skill: str
-) -> tuple[RecordingSandbox, str]:
-    """Run a session whose model loads ``skill``; return its sandbox and input."""
-    model = ScriptedModel({_TASK: [("skill", {"name": skill})]})
-    monkeypatch.setattr(EXECUTE_COMPLETION, model)
-    sandbox = RecordingSandbox(project)
-    host = LocalHarnessHost()
-    report = await run_headless(
-        harness_options=_options(sandbox),
-        prompt=_TASK,
-        stop=StopRequests(RunLimits()),
-        harness_host=host,
-    )
-    await host.close()
-    assert report.result.outcome is RunOutcome.FINISHED, report.result.error
-    return sandbox, model.final_input(_TASK)
-
-
 def _uploads(sandbox: RecordingSandbox) -> list[str]:
     return [
         command
         for command in sandbox.commands
         if any(marker in command for marker in _UPLOAD_MARKERS)
     ]
-
-
-def _installs(sandbox: RecordingSandbox) -> list[str]:
-    """The commands that write copies, as opposed to streaming their input."""
-    return [command for command in sandbox.commands if _INSTALL_MARKER in command]
 
 
 def _copies(sandbox_tmp: Path) -> dict[str, dict[str, bytes]]:
@@ -137,134 +78,6 @@ def _write_skill(directory: Path, name: str, body: str) -> Path:
         encoding="utf-8",
     )
     return directory
-
-
-def _workspace_changes(project: Path) -> str:
-    return subprocess.run(
-        ["git", "status", "--porcelain", "--untracked-files=all"],
-        cwd=project,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-
-
-@pytest.mark.asyncio
-async def test_the_builtin_skills_are_copied_once_and_reused_by_a_later_run(
-    project: Path, sandbox_tmp: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """*Prepare*: A sandbox with nothing copied yet.
-    *Do*: Run a session that loads the built-in `vibe:vibe` skill, then a
-    second one on the same sandbox.
-    *Assert*: The first run uploads once, and its copies hold the built-in
-    skills' files; the model is told sandbox paths for every skill and for the
-    loaded one's base directory; the second run uploads nothing and is told
-    the same paths; neither touches the workspace.
-    """
-    # Do
-    first, first_input = await _run_skill(project, monkeypatch, "vibe:vibe")
-    second, second_input = await _run_skill(project, monkeypatch, "vibe:vibe")
-
-    # Assert
-    copies = _copies(sandbox_tmp)
-    builtins = {
-        directory.name: (directory / "SKILL.md").read_bytes()
-        for directory in _BUILTIN_SKILLS.iterdir()
-        if (directory / "SKILL.md").is_file()
-    }
-    assert sorted(copy["SKILL.md"] for copy in copies.values()) == sorted(
-        builtins.values()
-    )
-    assert all(list(copy) == ["SKILL.md"] for copy in copies.values())
-    assert len(_installs(first)) == 1
-    assert _uploads(second) == []
-
-    root = f"{sandbox_tmp}/{SKILLS_DIRNAME}/"
-    paths = _SKILL_PATH.findall(first_input)
-    assert len(paths) == len(builtins)
-    assert all(path.startswith(root) for path in paths)
-    assert {path.removeprefix(root).removesuffix("/SKILL.md") for path in paths} == (
-        set(copies)
-    )
-    vibe_digest = next(
-        digest
-        for digest, copy in copies.items()
-        if copy["SKILL.md"] == builtins["vibe"]
-    )
-    assert _BASE_DIR.findall(first_input) == [f"{root}{vibe_digest}"]
-    assert _SKILL_PATH.findall(second_input) == paths
-    assert _BASE_DIR.findall(second_input) == [f"{root}{vibe_digest}"]
-    assert str(_BUILTIN_SKILLS) not in first_input
-    assert _workspace_changes(project) == ""
-
-
-@pytest.mark.asyncio
-async def test_a_user_skill_is_copied_with_its_files(
-    project: Path, sandbox_tmp: Path, config_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """*Prepare*: A user skill with a script, and a cache directory the skill
-    tool skips.
-    *Do*: Run a session that loads it.
-    *Assert*: Its copy holds the skill and its script, not the cache; the
-    model is told the copy's directory and the script, never the host path;
-    the workspace is untouched.
-    """
-    # Prepare
-    skill_dir = _write_skill(config_dir / "skills" / "deploy", "deploy", "Deploy.")
-    (skill_dir / "scripts").mkdir()
-    (skill_dir / "scripts" / "run.sh").write_text("echo deploy\n", encoding="utf-8")
-    (skill_dir / "__pycache__").mkdir()
-    (skill_dir / "__pycache__" / "x.pyc").write_bytes(b"cache")
-
-    # Do
-    _, model_input = await _run_skill(project, monkeypatch, "deploy")
-
-    # Assert
-    (digest,) = [
-        digest
-        for digest, copy in _copies(sandbox_tmp).items()
-        if b"Deploy." in copy["SKILL.md"]
-    ]
-    copy = _copies(sandbox_tmp)[digest]
-    assert sorted(copy) == ["SKILL.md", "scripts/run.sh"]
-    base_dir = f"{sandbox_tmp}/{SKILLS_DIRNAME}/{digest}"
-    assert _BASE_DIR.findall(model_input) == [base_dir]
-    assert f"<path>{base_dir}/SKILL.md</path>" in model_input
-    assert "<file>scripts/run.sh</file>" in model_input
-    assert str(skill_dir) not in model_input
-    assert _workspace_changes(project) == ""
-
-
-@pytest.mark.asyncio
-async def test_a_project_skill_is_read_in_the_sandbox_and_wins_over_a_user_skill(
-    project: Path, sandbox_tmp: Path, config_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """*Prepare*: A project skill in the sandbox's `.agents/skills`, with a
-    checklist, and a user skill of the same name.
-    *Do*: Run a session that loads it.
-    *Assert*: The model gets the project's skill at its sandbox path, with
-    its checklist, and nothing of it is copied.
-    """
-    # Prepare
-    skill_dir = _write_skill(
-        project / ".agents" / "skills" / "release", "release", "Project release."
-    )
-    (skill_dir / "checklist.md").write_text("- tag\n", encoding="utf-8")
-    _write_skill(config_dir / "skills" / "release", "release", "User release.")
-
-    # Do
-    _, model_input = await _run_skill(project, monkeypatch, "release")
-
-    # Assert
-    assert "Project release." in model_input
-    assert "User release." not in model_input
-    assert _BASE_DIR.findall(model_input) == [str(skill_dir)]
-    assert f"<path>{skill_dir}/SKILL.md</path>" in model_input
-    assert "<file>checklist.md</file>" in model_input
-    assert not any(
-        b"Project release." in copy["SKILL.md"]
-        for copy in _copies(sandbox_tmp).values()
-    )
 
 
 @pytest.mark.asyncio

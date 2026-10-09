@@ -18,6 +18,7 @@ from vibe.core.trusted_folders import (
     find_trustable_files,
     find_untrusted_config_dirs,
     has_agents_md_file,
+    trusted_folders_manager,
 )
 
 
@@ -703,3 +704,17 @@ class TestFindGitRepoAncestor:
         monkeypatch.setattr(Path, "home", classmethod(lambda _cls: tmp_path / "home"))
 
         assert find_git_repo_ancestor(cwd) is None
+
+
+def test_session_trust_does_not_write_to_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trust_file = tmp_path / "trusted_folders.toml"
+    monkeypatch.setattr(trusted_folders_manager, "_file_path", trust_file)
+    project = tmp_path / "proj"
+    project.mkdir()
+
+    trusted_folders_manager.trust_for_session(project)
+
+    assert trusted_folders_manager.is_trusted(project) is True
+    assert not trust_file.exists()

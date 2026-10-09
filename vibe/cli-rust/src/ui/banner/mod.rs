@@ -12,11 +12,6 @@ use super::theme;
 use crate::utils::startup_cache::StartupConfig;
 use petit_chat::{CatVariant, PetitChat};
 
-/// Rust-only hint shown as its own line under the banner info block; suppressed
-/// under the e2e replay harness so it never breaks parity with the Python CLI.
-const RUST_BUILD_HINT: &str =
-    "You are using the new Vibe TUI. To switch back to the classic TUI, set the `VIBE_CLI` environment variable to `python`.";
-
 /// The welcome banner: an animated cat above a static info block.
 #[derive(Default)]
 pub struct Banner {
@@ -88,13 +83,6 @@ impl Banner {
             Span::styled("/help", cmd),
             Span::styled(" for more information", meta),
         ]));
-        if show_rust_hint() {
-            lines.push_gap();
-            lines.push(Line::from(Span::styled(
-                RUST_BUILD_HINT,
-                theme::text(theme::warning()),
-            )));
-        }
         // `.greeting-message` `margin-top: 1`: one blank row above the greeting.
         if let Some(greeting) = &self.greeting {
             lines.push_gap();
@@ -102,13 +90,6 @@ impl Banner {
         }
         lines
     }
-}
-
-/// The Rust-only hint is shown in real runs. Under the e2e replay harness it is
-/// suppressed to preserve parity with the Python CLI, unless a scenario opts back
-/// in with `VIBE_TEST_SHOW_RUST_HINT` so one golden can capture its appearance.
-fn show_rust_hint() -> bool {
-    !crate::utils::is_replaying() || std::env::var_os("VIBE_TEST_SHOW_RUST_HINT").is_some()
 }
 
 fn meta_counts(config: &StartupConfig) -> String {

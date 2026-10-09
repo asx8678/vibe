@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 TMP_CLEANUP_INTERVAL = timedelta(seconds=5)
 
 
-# Over the method limit, as AgentLoop and VibeApp already are: most of these
+# Over the method limit, as AgentLoop already is: most of these
 # are one-line accessors onto the metadata record this owns, and hiding them
 # behind a second object would put a hop between the log and everything that
 # reads it.

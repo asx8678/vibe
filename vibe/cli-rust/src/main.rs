@@ -22,7 +22,6 @@ async fn main() -> std::process::ExitCode {
         Ok(code) => code,
         Err(error) => {
             session_exit::print_error(&error.to_string());
-            vibe_rs::rollout::print_fallback_hint();
             // Python flushes in a `finally` on every exit path, after the
             // error itself is reported.
             observability::sentry::flush();
@@ -32,7 +31,6 @@ async fn main() -> std::process::ExitCode {
 }
 
 async fn run() -> Result<std::process::ExitCode> {
-    vibe_rs::rollout::install_panic_hint();
     vibe_rs::clipboard::set_sink(Arc::new(vibe_rs::clipboard::SystemClipboard));
     let mut timings = StartupRecorder::new();
     timings.record("process_entry");

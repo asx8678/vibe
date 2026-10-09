@@ -9,7 +9,7 @@ metadata:
 
 # Vibe Rust TUI
 
-UI conventions for `vibe/cli-rust/`. Every screen follows them so the TUI reads as one product. Process rules (porting from Python, scenarios, goldens) live in `migrate-cli-to-rust`; local code rules live in `vibe/cli-rust/AGENTS.md`.
+UI conventions for `vibe/cli-rust/`. Every screen follows them so the TUI reads as one product. Process rules (scenarios, goldens) live in `migrate-cli-to-rust`; local code rules live in `vibe/cli-rust/AGENTS.md`.
 
 ## Shortcut hints
 

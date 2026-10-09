@@ -25,7 +25,7 @@ pub enum OutputFormat {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "vibe", bin_name = "vibe", version = env!("CARGO_PKG_VERSION"), disable_version_flag = true, about = "Rust TUI for Vibe (PoC)", after_help = "Commands:\n  update         Check for a Vibe update now (same as --check-upgrade).")]
+#[command(name = "vibe", bin_name = "vibe", version = env!("CARGO_PKG_VERSION"), disable_version_flag = true, about = "Run the Mistral Vibe interactive CLI", after_help = "Commands:\n  update         Check for a Vibe update now (same as --check-upgrade).")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<CliCommand>,

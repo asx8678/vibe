@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-# Stdlib-only: the `vibe` launcher imports this before choosing the Rust or Python TUI.
+# Stdlib-only: keep this module cheap to import.
 _DEFAULT_VIBE_HOME = Path.home() / ".vibe"
 
 

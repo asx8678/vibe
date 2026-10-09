@@ -2,7 +2,7 @@
 
 Conventions for AI agents and humans contributing to **Mistral Vibe** — a Python 3.12+ CLI coding assistant managed with `uv`.
 
-Layout: `vibe/core` is the engine (agent loop, tools, LLM backends, config); `vibe/cli` is the legacy Python (Textual) TUI; `vibe/cli-rust` is the Rust (Ratatui) TUI that will replace it, a thin client over `vibe-app-server`; `vibe/acp` bridges to the Agent Client Protocol; `vibe/setup` runs first-run wizards. Tests live in `tests/` with autouse fixtures in `conftest.py` and test doubles in `tests/stubs/`.
+Layout: `vibe/core` is the engine (agent loop, tools, LLM backends, config); `vibe/cli-rust` is the Rust (Ratatui) TUI that `vibe` runs, a thin client over `vibe-app-server`; `vibe/cli` holds the `vibe` launcher plus the audio, voice and Textual helpers that ACP and onboarding still use (the Python Textual TUI has been removed); `vibe/acp` bridges to the Agent Client Protocol; `vibe/setup` holds auth and the Textual onboarding behind `vibe-acp --setup`. Tests live in `tests/` with autouse fixtures in `conftest.py` and test doubles in `tests/stubs/`.
 
 ## Architecture Decisions
 
@@ -13,7 +13,7 @@ When creating or editing an ADR, follow the `write-vibe-adr` skill and keep the 
 | Change area | ADR |
 | --- | --- |
 | Architecture principles, module boundaries, startup/runtime speed, simple changes | [0001 Architecture Principles](docs/adr/0001-architecture-principles.md) |
-| Core engine, Textual CLI, ACP, setup, or programmatic surfaces | [0002 Core Engine And Delivery Surfaces](docs/adr/0002-core-engine-and-delivery-surfaces.md) |
+| Core engine, ACP, setup, or programmatic surfaces | [0002 Core Engine And Delivery Surfaces](docs/adr/0002-core-engine-and-delivery-surfaces.md) |
 | Agent loop orchestration, streaming, typed events, cancellation, or responsiveness | [0003 Event Driven Agent Loop](docs/adr/0003-event-driven-agent-loop.md) |
 | Tool contracts, permissions, tool output, UI metadata, or tool adapters | [0004 Typed Permissioned Tools](docs/adr/0004-typed-permissioned-tools.md) |
 | Config models, layering, defaults, migrations, reloads, or runtime overrides | [0005 Layered Configuration](docs/adr/0005-layered-configuration.md) |
@@ -21,7 +21,7 @@ When creating or editing an ADR, follow the `write-vibe-adr` skill and keep the 
 | Skills, agents, subagents, hooks, MCP, connectors, custom tools, or discovery | [0007 Extension Mechanisms](docs/adr/0007-extension-mechanisms.md) |
 | Adding or changing analytics instrumentation, telemetry events, or event properties | [0008 Feature Instrumentation](docs/adr/0008-feature-instrumentation.md) |
 | App-server ownership, RPCs, lifecycle, projections, effects, callbacks, client tools, or delivery adapters | [0009 App Server Boundary](docs/adr/0009-app-server-boundary.md) |
-| Textual `Content` rendering, styled text, markup parsing, or theme variables in widgets | [0010 Textual Content Rendering](docs/adr/0010-textual-content-rendering.md) |
+| Textual `Content` rendering, styled text, markup parsing, or theme variables in the onboarding widgets | [0010 Textual Content Rendering](docs/adr/0010-textual-content-rendering.md) |
 | App-server session backend interfaces, adapters, or runtime ownership | [0011 App Server Session Backends](docs/adr/0011-unified-harness-backend.md) |
 | Slash commands running while busy, side-channel commands, or idle-only settings persistence | [0012 Slash Commands While Busy](docs/adr/0012-two-phase-slash-command-execution.md) |
 | Queued-prompt selection/edit mode, copy-on-write consumed edits, or promotion-race widget-identity tracking | [0013 Queue Selection and Edit Mode](docs/adr/0013-queue-edit-mode.md) |
@@ -32,11 +32,10 @@ When creating or editing an ADR, follow the `write-vibe-adr` skill and keep the 
 
 ## Terminal UI changes
 
-The Python TUI is still the default in production but is being deprecated in favor of the Rust TUI. Every user-visible change to the Python TUI (`vibe/cli`, plus the Textual screens in `vibe/setup`), whether a new feature, behavior change, or bug fix, must also land in `vibe/cli-rust` in the same PR.
+The Rust TUI (`vibe/cli-rust`) is the only terminal UI; the Python Textual TUI has been removed, so do not reintroduce a Python interactive client.
 
-- Put server-owned behavior (session, config and persistence, tools, network; see the ownership table in ADR 0009) behind an app-server method or notification so both clients only render it. Keep presentation state (widgets, layout, focus, selection, editing) in each client.
-- For the Rust side, follow `vibe/cli-rust/AGENTS.md` and cover the behavior with a `client-e2e` scenario and golden (see `client-e2e/AGENTS.md`).
-- Exceptions: Rust-only changes and divergences allowed by `vibe/cli-rust/AGENTS.md`; changes to a feature not yet ported to Rust (state the gap in the PR notes, do not port the parent feature); intentionally Python-only fixes (one-line justification in the PR notes).
+- Put server-owned behavior (session, config and persistence, tools, network; see the ownership table in ADR 0009) behind an app-server method or notification so the client only renders it. Keep presentation state (widgets, layout, focus, selection, editing) in the client.
+- Follow `vibe/cli-rust/AGENTS.md` and cover the behavior with a `client-e2e` scenario and golden (see `client-e2e/AGENTS.md`).
 
 ## Commands
 

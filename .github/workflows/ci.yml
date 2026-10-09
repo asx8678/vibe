@@ -115,8 +115,7 @@ jobs:
           # needs ALSA/libasound, absent here); macOS/Windows ship voice via
           # CoreAudio/WASAPI. This gate builds the real wheel (non-editable, so
           # the combined build backend bundles both native components), installs
-          # it, then launches both the
-          # default Python mode and VIBE_CLI=rust from the installed artifact.
+          # it, then launches the bundled Rust TUI from the installed artifact.
           - runner: ubuntu-22.04
             os: linux
             arch: x86_64
@@ -200,7 +199,7 @@ jobs:
           echo "Installing $wheel"
           uv pip install --python .smoke "$wheel"
 
-      - name: Smoke test default (Python) mode
+      - name: Smoke test vibe (bundled Rust TUI)
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
@@ -219,18 +218,6 @@ jobs:
             python=".smoke/bin/python"
           fi
           "$python" scripts/ci/validate-combined-wheel.py
-
-      - name: Smoke test Rust mode (VIBE_CLI=rust)
-        shell: bash
-        env:
-          VIBE_CLI: rust
-        run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            vibe=".smoke/Scripts/vibe"
-          else
-            vibe=".smoke/bin/vibe"
-          fi
-          "$vibe" --version
 
   snapshot-tests:
     name: Snapshot Tests

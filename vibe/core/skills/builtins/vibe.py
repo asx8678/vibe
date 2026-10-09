@@ -427,34 +427,20 @@ default_agent = "plan"
 
 ### MCP Servers
 
-Remote MCP servers can be added non-interactively from the shell:
+Remote OAuth MCP servers can be added non-interactively from the shell, with the
+same syntax as the in-app `/mcp add`:
 
 ```bash
-vibe mcp add mistralai \\
-  --url https://api.mistral.ai/mcp \\
-  --transport streamable-http \\
-  --api-key-env MISTRAL_API_KEY
-
-vibe mcp add linear \\
-  --url https://mcp.linear.app/mcp
-
-vibe mcp remove mistralai
+vibe mcp add https://mcp.linear.app/mcp --name linear
+vibe mcp add https://mcp.linear.app/mcp --name linear --no-login
+vibe mcp remove linear
 ```
 
-Static auth is selected when `--api-key-env` or `--header` is provided.
-Otherwise the server uses OAuth and starts browser login by default. Pass
-`--no-login` to only persist the OAuth configuration. Run
-`vibe mcp add --help` for all supported authentication and timeout options.
-Use `vibe mcp remove <name>` to remove a server from the user configuration;
-stored OAuth credentials are deleted when available.
-
-With `VIBE_CLI` set to `rust`, shell `mcp add` uses the OAuth-only `/mcp add`
-syntax: `vibe mcp add https://mcp.linear.app/mcp --name linear --no-login`.
-It accepts repeatable `--scope`, `--transport`, and `--allow-insecure-http`;
-without `--no-login`, it starts browser login. Both `add` and `remove NAME`
-update user config without a chat session. Set `VIBE_CLI` to `python` and run
-`vibe mcp add` for the stdio/static-auth flags above. `remove` is argv-only,
-not a slash command.
+`vibe mcp add` accepts repeatable `--scope`, `--transport`, and
+`--allow-insecure-http`; without `--no-login`, it starts browser login. Both
+`add` and `remove NAME` update user config without a chat session. Stdio
+servers and servers with static auth (API keys or headers) go in `config.toml`
+directly. `remove` is argv-only, not a slash command.
 
 Hosted OAuth MCP servers can also be added from inside Vibe:
 
@@ -523,8 +509,9 @@ The legacy backend keeps a discovered connector disabled until it has an
 explicit `[[connectors]]` entry. The Unified Harness backend (the default
 runtime) enables ready connectors by default in memory. It does not write that
 default to TOML, and the master switch plus explicit connector, tool, allowlist,
-and denylist settings always take precedence. Use `--legacy-harness` for the
-temporary legacy escape hatch if you prefer the old behavior.
+and denylist settings always take precedence. The `vibe` TUI always runs the
+Unified Harness; `vibe-acp --legacy-harness` is the temporary legacy escape
+hatch for ACP clients.
 
 The `/connectors` (alias `/mcp`) list shows an "Add more connectors in Studio"
 link under the connectors group; selecting it opens the tenant's connectors
@@ -799,9 +786,6 @@ vibe -p TEXT / --prompt TEXT         # Programmatic mode using `default_agent`, 
 vibe -p TEXT --auto-approve          # Programmatic mode with all tool calls approved
 vibe -p TEXT --agent lean --yolo      # Lean mode with all tool calls approved
 vibe -p < task.md                   # Programmatic mode reading the prompt from stdin
-vibe --prompt-file PATH             # Programmatic mode reading the prompt from a file
-vibe -p TEXT --output-dir DIR       # Write DIR/export.json (outcome, usage, cost, config) and copy the session journal to DIR/session on every exit
-vibe -p TEXT --time-limit SECONDS   # Stop the run after SECONDS (outcome `deadline`); SIGTERM stops it the same way (outcome `terminated`)
 vibe --agent NAME                   # Select agent profile (falls back to `default_agent` config)
 vibe --auto-approve / --yolo         # Approve all tool calls for the selected agent
 vibe --workdir DIR                  # Change working directory
@@ -815,21 +799,16 @@ vibe -v / --version                 # Show version
 vibe --setup                        # Run onboarding/setup
 vibe update / vibe --check-upgrade  # Check for a Vibe update now, prompt to install it, and exit
 vibe --max-turns N                  # Max assistant turns (programmatic mode)
-vibe --max-price DOLLARS            # Max cost limit (programmatic mode; outcome `price_limit`)
-vibe --max-tokens N                 # Max total session tokens (programmatic mode; outcome `token_limit`)
+vibe --max-price DOLLARS            # Max cost limit (programmatic mode)
+vibe --max-tokens N                 # Max total session tokens (programmatic mode)
 vibe --enabled-tools TOOL           # Enable specific tools (repeatable)
 vibe --disabled-tools TOOL          # Disable specific tools (repeatable)
 vibe --output text|json|streaming   # Output format (programmatic mode)
-vibe --experimental-harness        # Select the Unified Harness backend (redundant: it is the default runtime)
-vibe --legacy-harness             # Force the legacy Python harness (temporary escape hatch)
 ```
 
-Programmatic mode exit codes: `0` the agent finished; `1` usage or config error;
-`2` infrastructure failure (model API after retries, runtime); `3` the agent
-stopped without finishing, on a limit or a model refusal (`turn_limit`,
-`token_limit`, `price_limit`, `deadline`, `terminated`, `length`, `refusal`).
-`export.json` records the same `outcome`. A stopped session can be resumed with
-`--resume SESSION_ID`.
+Programmatic mode exit codes: `0` the agent finished; `1` the run failed (usage
+or config error, a `--max-*` limit reached, or a model API or runtime failure),
+with the reason printed on stderr.
 
 ## Built-in Agents
 
@@ -906,7 +885,7 @@ already starts a child that inherits the parent's prompt and tools.
   skill, pin it to a version or alias, convert it to a local copy, or remove it.
   Registered only when `experimental_enable_registry_skills` is set.
 - `/thinking` - Select thinking level
-- `/theme` - Select Textual UI theme; `auto` follows terminal/OS appearance (persisted in config)
+- `/theme` - Select the UI theme; `auto` follows terminal/OS appearance (persisted in config)
 - `/reload` - Reload configuration, agent instructions, and skills from disk
 - `/clear`, `/new` - Start a new conversation. Optionally pass a prompt to seed it
 - `/log` - Show path to current interaction log file
@@ -946,10 +925,8 @@ already starts a child that inherits the parent's prompt and tools.
   repeatable `--scope <scope>`, `--transport <http|streamable-http>`,
   `--no-login`, and `--allow-insecure-http` (permit a plaintext `http://` URL on
   a non-localhost host such as a LAN server). Starts OAuth login by default.
-  OAuth-only; use `vibe mcp add <name> --url <url> --api-key-env <var>` for
-  API-key/static auth.
-- `vibe mcp remove <name>` - Remove an MCP server from the user configuration
-  and delete its stored OAuth credentials when available.
+  OAuth-only; add API-key/static-auth servers in `config.toml`.
+- `vibe mcp remove <name>` - Remove an MCP server from the user configuration.
 - `/mcp status` - Display MCP auth state (`ok`, `needs_auth`, `static`, `stdio`)
 - `/mcp login <alias>` - Start OAuth login for an MCP server
 - `/mcp logout <alias>` - Log out from an MCP server and delete stored OAuth
@@ -1012,8 +989,8 @@ behavior then depends on the mention kind:
 Image attachments:
 
 - Require `supports_images = true` on the active model in `config.toml`.
-  The legacy loop rejects an image its model cannot read; under
-  `--experimental-harness` the send always goes through, and the agent is
+  The legacy loop (`vibe-acp --legacy-harness`) rejects an image its model
+  cannot read; on the Unified Harness the send always goes through, and the agent is
   shown a description of the image or, failing that, a link to the file.
 - The describer is picked automatically: any `supports_images` model on
   the active model's **own** provider, no config needed. Same provider
@@ -1296,8 +1273,6 @@ offered inline, and no popup is shown.
   executables inside the current project.
 - `MISTRAL_API_KEY` - API key for Mistral provider
 - `VIBE_ACTIVE_MODEL` - Override active model
-- `VIBE_CLI` - Selects the CLI implementation: `rust` starts the experimental
-  Rust TUI; any other value (or unset) runs the legacy Python (Textual) TUI.
 - `VIBE_*` - Any config field can be overridden with the `VIBE_` prefix
 - `LOG_LEVEL` - Overrides `log_level` config for `$VIBE_HOME/logs/vibe.log`.
   One of `DEBUG`, `INFO`, `WARNING` (default), `ERROR`, `CRITICAL`. Invalid values

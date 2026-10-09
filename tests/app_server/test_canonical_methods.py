@@ -8,6 +8,7 @@ import pytest
 
 from tests.conftest import build_test_agent_loop
 from tests.mock.utils import mock_llm_chunk
+from tests.stubs.app_config import build_test_app_config
 from tests.stubs.app_server import attach_test_app_server_session, start_test_app_server
 from tests.stubs.fake_backend import FakeBackend
 from vibe.app_server.client import AppServerClient
@@ -253,3 +254,11 @@ async def test_queued_steering_is_not_implemented_on_the_legacy_backend() -> Non
 
     # Assert
     assert exc_info.value.error.code is ProtocolErrorCode.NOT_IMPLEMENTED
+
+
+def test_config_read_response_accepts_missing_startup_issue() -> None:
+    response = ConfigReadResponse.model_validate({
+        "config": build_test_app_config().model_dump(mode="json", by_alias=True)
+    })
+
+    assert response.startup_issue is None

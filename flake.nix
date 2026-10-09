@@ -212,10 +212,9 @@
           package = pythonSet.mistral-vibe;
         };
 
-        # Convenience alias: the full application with the Rust TUI forced
-        # via VIBE_CLI, so `nix build` and `nix run` both accept .#rustCli.
+        # Convenience alias kept for existing `.#rustCli` users; `vibe` always
+        # runs the Rust TUI now.
         rustCli = pkgs.writeShellScriptBin "vibe" ''
-          export VIBE_CLI=rust
           exec "${self.packages.${system}.default}/bin/vibe" "$@"
         '';
       };

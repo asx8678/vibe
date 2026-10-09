@@ -17,6 +17,12 @@ package imports nothing from `ui` and no terminal library types.
 This boundary is independent of [0011](0011-unified-harness-backend.md): the Rust
 client targets the app-server protocol, not a specific session backend.
 
+> **Amendment (2026-10):** The Python Textual CLI has been removed, so `vibe-rs`
+> is the only terminal delivery surface. The `vibe` launcher always execs it; the
+> `VIBE_CLI` selector, the `vibe_cli_rust_tui_rollout` experiment, and the Rust
+> client's "switch back to the classic TUI" hints are gone. The Textual widgets
+> left under `vibe/cli/textual_ui` serve only the `vibe-acp --setup` onboarding.
+
 ## Rationale
 
 Rust gives a single static binary, predictable startup, and a memory-safe

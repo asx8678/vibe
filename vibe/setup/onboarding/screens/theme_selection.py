@@ -6,12 +6,20 @@ from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Center, Container, Horizontal, Vertical
 from textual.events import Resize
+from textual.theme import BUILTIN_THEMES
 from textual.widgets import Markdown, Static
 
 from vibe.cli.textual_ui.shortcut_hints import shortcut, shortcut_hint
-from vibe.cli.textual_ui.widgets.theme_picker import sorted_theme_names
 from vibe.cli.theme import resolve_theme
+from vibe.config_values import AUTO_THEME
 from vibe.setup.onboarding.base import OnboardingScreen
+
+
+def sorted_theme_names() -> list[str]:
+    light = sorted(name for name, t in BUILTIN_THEMES.items() if not t.dark)
+    dark = sorted(name for name, t in BUILTIN_THEMES.items() if t.dark)
+    return [AUTO_THEME] + light + dark
+
 
 THEMES = sorted_theme_names()
 

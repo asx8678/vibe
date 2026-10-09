@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 import uuid
 
 import pytest
@@ -128,3 +129,45 @@ def test_classify_verdict_reaches_the_log_file(tmp_path: Path) -> None:
         assert "tool=file_system.read_file" in written
     finally:
         _teardown_file_logging(target)
+
+
+def test_experimental_harness_factory_comes_from_harness_distribution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported_modules: list[str] = []
+
+    def create_host_stub():
+        raise NotImplementedError("Harness stub selected")
+
+    def import_stub(module_name: str):
+        imported_modules.append(module_name)
+        return SimpleNamespace(create_harness_host=create_host_stub)
+
+    monkeypatch.setattr(_experimental_harness, "import_module", import_stub)
+
+    with pytest.raises(
+        _experimental_harness.ExperimentalHarnessUnavailableError,
+        match="Harness stub selected",
+    ):
+        _experimental_harness.create_experimental_harness_host()
+
+    assert imported_modules == ["mistralai_vibe_local_harness.vibe"]
+
+
+def test_experimental_harness_factory_reports_unavailable_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable(_module_name: str):
+        raise ModuleNotFoundError("No module named 'mistralai_vibe_local_harness'")
+
+    monkeypatch.setattr(_experimental_harness, "import_module", unavailable)
+
+    with pytest.raises(
+        _experimental_harness.ExperimentalHarnessUnavailableError
+    ) as exc_info:
+        _experimental_harness.create_experimental_harness_host()
+
+    message = str(exc_info.value)
+    assert "could not be loaded" in message
+    assert "--legacy-harness" in message
+    assert "uv tool upgrade mistral-vibe" in message

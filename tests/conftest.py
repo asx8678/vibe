@@ -14,21 +14,9 @@ import keyring.errors
 import pytest
 import tomli_w
 
-from tests.stubs.app_server import create_test_app_server_session
-from tests.stubs.fake_account_gateway import FakeAccountGateway
 from tests.stubs.fake_backend import FakeBackend
 from tests.stubs.fake_config_orchestrator import FakeConfigOrchestrator
-from tests.stubs.fake_identity_gateway import FakeIdentityGateway
 from tests.stubs.fake_mcp_registry import FakeMCPRegistry
-from tests.stubs.fake_voice_manager import FakeVoiceManager
-from tests.update_notifier.adapters.fake_update_cache_repository import (
-    FakeUpdateCacheRepository,
-)
-from tests.update_notifier.adapters.fake_update_gateway import FakeUpdateGateway
-from vibe.app_server._account import WhoAmIResult
-from vibe.app_server._identity import IdentityResult
-from vibe.app_server.models import AccountPlanKind
-from vibe.cli.textual_ui.app import CORE_VERSION, StartupOptions, VibeApp
 from vibe.cli.theme import resolve_auto_theme
 from vibe.core.agent_loop import AgentLoop
 from vibe.core.agents.models import BuiltinAgentName
@@ -318,11 +306,6 @@ def host_platform(_mock_platform: None, monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 @pytest.fixture(autouse=True)
-def _mock_update_commands(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("vibe.cli.update_notifier.update.UPDATE_COMMANDS", ["true"])
-
-
-@pytest.fixture(autouse=True)
 def _disable_feedback_bar(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("vibe.core.feedback.FEEDBACK_PROBABILITY", 0)
 
@@ -355,18 +338,6 @@ def _isolate_model_availability(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(model_probe, "_probe", _no_verdict)
     monkeypatch.setattr(model_probe.MODEL_AVAILABILITY, "_source", _NoVerdictSource())
     model_probe.MODEL_AVAILABILITY.reset()
-
-
-@pytest.fixture(autouse=True)
-def _disable_input_grace_periods(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "vibe.cli.textual_ui.widgets.approval_app._INPUT_GRACE_PERIOD_S", 0
-    )
-    monkeypatch.setattr(
-        "vibe.cli.textual_ui.widgets.question_app._INPUT_GRACE_PERIOD_S", 0
-    )
-    monkeypatch.setattr("vibe.cli.textual_ui.app._DEFAULT_TYPING_DEBOUNCE_MS", 0)
-    monkeypatch.delenv("VIBE_TYPING_GRACE_PERIOD_MS", raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -416,11 +387,6 @@ def mock_prompts_dirs(
         lambda: _MockManager(sources=("user",)),
     )
     return project, user
-
-
-@pytest.fixture
-def vibe_app() -> VibeApp:
-    return build_test_vibe_app()
 
 
 @pytest.fixture
@@ -615,69 +581,5 @@ def build_test_agent_loop(
         backend=backend or FakeBackend(),
         enable_streaming=enable_streaming,
         mcp_registry=kwargs.pop("mcp_registry", FakeMCPRegistry()),
-        **kwargs,
-    )
-
-
-def build_test_vibe_app(
-    *,
-    config: VibeConfigSchema | None = None,
-    agent_loop: AgentLoop | None = None,
-    **kwargs,
-) -> VibeApp:
-    app_config = config or build_test_vibe_config()
-
-    resolved_agent_loop = agent_loop or build_test_agent_loop(config=app_config)
-
-    update_notifier = kwargs.pop("update_notifier", None)
-    resolved_update_notifier = (
-        FakeUpdateGateway() if update_notifier is None else update_notifier
-    )
-    update_cache_repository = kwargs.pop("update_cache_repository", None)
-    resolved_update_cache_repository = (
-        FakeUpdateCacheRepository()
-        if update_cache_repository is None
-        else update_cache_repository
-    )
-    account_gateway = kwargs.pop("account_gateway", None)
-    resolved_account_gateway = account_gateway or FakeAccountGateway(
-        WhoAmIResult(
-            plan_type=AccountPlanKind.CHAT,
-            plan_name="INDIVIDUAL",
-            prompt_switching_to_pro_plan=False,
-        )
-    )
-    identity_gateway = kwargs.pop("identity_gateway", None)
-    resolved_identity_gateway = identity_gateway or FakeIdentityGateway(
-        IdentityResult(id="user-1", email="user@example.com", first_name="Ada")
-    )
-    current_version = kwargs.pop("current_version", None)
-    resolved_current_version = (
-        CORE_VERSION if current_version is None else current_version
-    )
-    voice_manager = kwargs.pop("voice_manager", FakeVoiceManager())
-    app_server = kwargs.pop("app_server", None)
-    app_server_source = (
-        app_server
-        if app_server is not None
-        else lambda: create_test_app_server_session(
-            resolved_agent_loop,
-            account_gateway=resolved_account_gateway,
-            identity_gateway=resolved_identity_gateway,
-        )
-    )
-    history_file = kwargs.pop("history_file", Path(".vibehistory"))
-    startup = kwargs.pop("startup", None) or StartupOptions(
-        initial_prompt=kwargs.pop("initial_prompt", None)
-    )
-
-    return VibeApp(
-        app_server=app_server_source,
-        history_file=history_file,
-        startup=startup,
-        current_version=resolved_current_version,
-        update_notifier=resolved_update_notifier,
-        update_cache_repository=resolved_update_cache_repository,
-        voice_manager=voice_manager,
         **kwargs,
     )
